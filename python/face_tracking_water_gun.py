@@ -44,6 +44,13 @@ RECTANGLE_COLOR = (0, 255, 0)  # Color of rectangle drawn around detected faces
 RECTANGLE_THICKNESS = 2  # Thickness of rectangle drawn around detected faces
 
 
+def connect_arduino(port: str = ARDUINO_PORT, baud_rate: int = BAUD_RATE) -> Serial:
+    """Create and return serial object for communication with arduino"""
+    arduino = Serial(port, baud_rate)
+    time.sleep(2)  # Let serial connection be established
+    return arduino
+
+
 def update_servo_pos(arduino: Serial, pan_angle: float, tilt_angle: float) -> None:
     """Generate bytestrings for updating servo angles"""
     pan_angle = np.clip(pan_angle, PAN_LIMITS[0], PAN_LIMITS[1])
@@ -90,13 +97,12 @@ def main() -> None:
     tilt_angle = DEFAULT_TILT_ANGLE
     video_capture = cv2.VideoCapture(0)  # 0 for default camera
     face_cascade = cv2.CascadeClassifier(CASCADE_MODEL_PATH)
-    arduino = Serial(ARDUINO_PORT, BAUD_RATE)  # create serial object named arduino
     ref_time = time.perf_counter()
     no_face_counter = time.perf_counter()
 
-    # Initial code (run once)
-    time.sleep(2)  # Let serial connection be established
-    update_servo_pos(arduino, pan_angle, tilt_angle)  # Set original tilt
+    # Connect to arduino and set camera to default angle
+    arduino = connect_arduino()
+    update_servo_pos(arduino, pan_angle, tilt_angle)
 
     # Create window
     _ = cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
