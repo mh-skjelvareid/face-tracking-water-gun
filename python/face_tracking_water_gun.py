@@ -37,16 +37,16 @@ DEFAULT_TILT_ANGLE = 110.0
 
 
 # Methods for changing camera angle
-def updateServoPos(arduino: Serial, panAngle: float, tiltAngle: float) -> None:
+def update_servo_pos(arduino: Serial, panAngle: float, tiltAngle: float) -> None:
     """Generate bytestrings for updating servo angles"""
     panAngle = np.clip(panAngle, PAN_LIMITS[0], PAN_LIMITS[1])
     tiltAngle = np.clip(tiltAngle, TILT_LIMITS[0], TILT_LIMITS[1])
 
-    sendServoPos(arduino, "P" + str(int(round(panAngle))) + "\n")
-    sendServoPos(arduino, "T" + str(int(round(tiltAngle))) + "\n")
+    send_servo_pos(arduino, "P" + str(int(round(panAngle))) + "\n")
+    send_servo_pos(arduino, "T" + str(int(round(tiltAngle))) + "\n")
 
 
-def sendServoPos(arduino: Serial, posString: str) -> None:
+def send_servo_pos(arduino: Serial, posString: str) -> None:
     """Write bytestring to arduino and print response"""
     arduino.write(posString.encode())
     response = arduino.readline()
@@ -65,7 +65,7 @@ def main() -> None:
 
     # Initial code (run once)
     time.sleep(2)  # Let serial connection be established
-    updateServoPos(arduino, panAngle, tiltAngle)  # Set original tilt
+    update_servo_pos(arduino, panAngle, tiltAngle)  # Set original tilt
 
     # Create window
     window = cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
@@ -106,13 +106,13 @@ def main() -> None:
                 # Update camera angle to reduce x and y error
                 panAngle -= PAN_GAIN * xError
                 tiltAngle -= TILT_GAIN * yError
-                updateServoPos(panAngle, tiltAngle)
+                update_servo_pos(panAngle, tiltAngle)
 
                 # Trigger relay if face is close enough
                 if faces[index_rOffsetMin, 2] > frameWidth * MIN_REL_FACE_WIDTH:
                     if time.perf_counter() > refTime + RETRIGGER_WAIT:
                         refTime = time.perf_counter()
-                        sendServoPos("R2\n")  # Send trigger code
+                        send_servo_pos("R2\n")  # Send trigger code
 
                 # Draw rectangle(s) around face(s)
                 for x, y, w, h in faces:
@@ -123,7 +123,7 @@ def main() -> None:
 
             # Reset camera angle if "no faces" timeout
             if time.perf_counter() > noFaceCounter + NO_FACE_RESET_TIME:
-                updateServoPos(DEFAULT_PAN_ANGLE, DEFAULT_TILT_ANGLE)
+                update_servo_pos(DEFAULT_PAN_ANGLE, DEFAULT_TILT_ANGLE)
 
             # Display the resulting frame (with or without faces)
             cv2.imshow("Video", frame)
