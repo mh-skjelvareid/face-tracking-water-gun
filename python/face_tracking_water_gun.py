@@ -44,7 +44,6 @@ RECTANGLE_COLOR = (0, 255, 0)  # Color of rectangle drawn around detected faces
 RECTANGLE_THICKNESS = 2  # Thickness of rectangle drawn around detected faces
 
 
-# Methods for changing camera angle
 def update_servo_pos(arduino: Serial, pan_angle: float, tilt_angle: float) -> None:
     """Generate bytestrings for updating servo angles"""
     pan_angle = np.clip(pan_angle, PAN_LIMITS[0], PAN_LIMITS[1])
@@ -59,6 +58,30 @@ def send_servo_pos(arduino: Serial, pos_string: str) -> None:
     arduino.write(pos_string.encode())
     response = arduino.readline()
     print(response.decode("ascii").rstrip())
+
+
+def face_relative_positions(
+    faces: np.ndarray, frame_width: int, frame_height: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Calculate positions of faces relative to image center"""
+    face_center_x = faces[:, 0] + faces[:, 2] / 2  # left edge + half width
+    face_center_y = faces[:, 1] + faces[:, 3] / 2  # lower edge + half height
+    x_offset = face_center_x - frame_width * (1 - DESIRED_FACE_POS[0])
+    y_offset = face_center_y - frame_height * (1 - DESIRED_FACE_POS[1])
+    r_offset = np.sqrt(x_offset**2 + y_offset**2)  # Radius from image center
+    return x_offset, y_offset, r_offset
+
+
+def draw_face_rectangles(frame: np.ndarray, faces: np.ndarray) -> None:
+    """Draw rectangles around detected faces in the frame"""
+    for x, y, w, h in faces:
+        cv2.rectangle(
+            frame,
+            (x, y),
+            (x + w, y + h),
+            RECTANGLE_COLOR,
+            RECTANGLE_THICKNESS,
+        )
 
 
 def main() -> None:
@@ -83,13 +106,13 @@ def main() -> None:
     try:
         while True:
             # Capture frame-by-frame, convert to greyscale for face detection
-            ret, frame = video_capture.read()
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            (frame_height, frame_width, n_channels) = frame.shape
+            _, frame = video_capture.read()
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            (frame_height, frame_width, _) = frame.shape
 
             # Detect faces
             faces = face_cascade.detectMultiScale(
-                gray,
+                gray_frame,
                 scaleFactor=CASCADE_SCALE_FACTOR,
                 minNeighbors=CASCADE_MIN_NEIGHBORS,
                 minSize=CASCADE_FACE_MIN_SIZE,
@@ -100,21 +123,15 @@ def main() -> None:
 
             # Process detected faces
             if not (len(faces) == 0):  # In any faces detected
-                # Find positions of faces relative to image center
-                face_center_x = faces[:, 0] + faces[:, 2] / 2  # left edge + half width
-                face_center_y = (
-                    faces[:, 1] + faces[:, 3] / 2
-                )  # lower edge + half height
-                x_offset = face_center_x - frame_width * (1 - DESIRED_FACE_POS[0])
-                y_offset = face_center_y - frame_height * (1 - DESIRED_FACE_POS[1])
-                r_offset = np.sqrt(
-                    x_offset**2 + y_offset**2
-                )  # Radius from image center
+                # Calculate positions of faces relative to image center
+                x_offset, y_offset, r_offset = face_relative_positions(
+                    faces, frame_width, frame_height
+                )
 
                 # Find face closest to center, calculate position error
-                index_r_offset_min = np.argmin(r_offset)
-                x_error = x_offset[index_r_offset_min]
-                y_error = y_offset[index_r_offset_min]
+                min_r_offset_index = np.argmin(r_offset)
+                x_error = x_offset[min_r_offset_index]
+                y_error = y_offset[min_r_offset_index]
 
                 # Update camera angle to reduce x and y error
                 pan_angle -= PAN_GAIN * x_error
@@ -122,22 +139,15 @@ def main() -> None:
                 update_servo_pos(arduino, pan_angle, tilt_angle)
 
                 # Trigger relay if face is close enough
-                if faces[index_r_offset_min, 2] > frame_width * MIN_REL_FACE_WIDTH:
+                if faces[min_r_offset_index, 2] > frame_width * MIN_REL_FACE_WIDTH:
                     if time.perf_counter() > ref_time + RETRIGGER_WAIT:
                         ref_time = time.perf_counter()
                         send_servo_pos(arduino, "R2\n")  # Send trigger code
 
                 # Draw rectangle(s) around face(s)
-                for x, y, w, h in faces:
-                    cv2.rectangle(
-                        frame,
-                        (x, y),
-                        (x + w, y + h),
-                        RECTANGLE_COLOR,
-                        RECTANGLE_THICKNESS,
-                    )
+                draw_face_rectangles(frame, faces)
 
-                # Reset "no faces" counter
+                # Face(s) detected, reset "no faces" counter
                 no_face_counter = time.perf_counter()
 
             # Reset camera angle if "no faces" timeout
