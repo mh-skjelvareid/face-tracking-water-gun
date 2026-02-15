@@ -37,35 +37,35 @@ DEFAULT_TILT_ANGLE = 110.0
 
 
 # Methods for changing camera angle
-def update_servo_pos(arduino: Serial, panAngle: float, tiltAngle: float) -> None:
+def update_servo_pos(arduino: Serial, pan_angle: float, tilt_angle: float) -> None:
     """Generate bytestrings for updating servo angles"""
-    panAngle = np.clip(panAngle, PAN_LIMITS[0], PAN_LIMITS[1])
-    tiltAngle = np.clip(tiltAngle, TILT_LIMITS[0], TILT_LIMITS[1])
+    pan_angle = np.clip(pan_angle, PAN_LIMITS[0], PAN_LIMITS[1])
+    tilt_angle = np.clip(tilt_angle, TILT_LIMITS[0], TILT_LIMITS[1])
 
-    send_servo_pos(arduino, "P" + str(int(round(panAngle))) + "\n")
-    send_servo_pos(arduino, "T" + str(int(round(tiltAngle))) + "\n")
+    send_servo_pos(arduino, "P" + str(int(round(pan_angle))) + "\n")
+    send_servo_pos(arduino, "T" + str(int(round(tilt_angle))) + "\n")
 
 
-def send_servo_pos(arduino: Serial, posString: str) -> None:
+def send_servo_pos(arduino: Serial, pos_string: str) -> None:
     """Write bytestring to arduino and print response"""
-    arduino.write(posString.encode())
+    arduino.write(pos_string.encode())
     response = arduino.readline()
     print(response.decode("ascii").rstrip())
 
 
 def main() -> None:
     # Initialize variables / objects
-    panAngle = DEFAULT_PAN_ANGLE
-    tiltAngle = DEFAULT_TILT_ANGLE
+    pan_angle = DEFAULT_PAN_ANGLE
+    tilt_angle = DEFAULT_TILT_ANGLE
     video_capture = cv2.VideoCapture(0)
-    faceCascade = cv2.CascadeClassifier(CASCADE_MODEL_PATH)
+    face_cascade = cv2.CascadeClassifier(CASCADE_MODEL_PATH)
     arduino = Serial("/dev/ttyACM0", 115200)  # create serial object named arduino
-    refTime = time.perf_counter()
-    noFaceCounter = time.perf_counter()
+    ref_time = time.perf_counter()
+    no_face_counter = time.perf_counter()
 
     # Initial code (run once)
     time.sleep(2)  # Let serial connection be established
-    update_servo_pos(arduino, panAngle, tiltAngle)  # Set original tilt
+    update_servo_pos(arduino, pan_angle, tilt_angle)  # Set original tilt
 
     # Create window
     window = cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
@@ -77,10 +77,10 @@ def main() -> None:
             # Capture frame-by-frame, convert to greyscale for face detection
             ret, frame = video_capture.read()
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            (frameHeight, frameWidth, nChannels) = frame.shape
+            (frame_height, frame_width, n_channels) = frame.shape
 
             # Detect faces
-            faces = faceCascade.detectMultiScale(
+            faces = face_cascade.detectMultiScale(
                 gray,
                 scaleFactor=CASCADE_SCALE_FACTOR,
                 minNeighbors=CASCADE_MIN_NEIGHBORS,
@@ -92,38 +92,38 @@ def main() -> None:
             # Process detected faces
             if not (len(faces) == 0):  # In any faces detected
                 # Find positions of faces relative to image center
-                faceCenterX = faces[:, 0] + faces[:, 2] / 2  # left edge + half width
-                faceCenterY = faces[:, 1] + faces[:, 3] / 2  # lower edge + half height
-                xOffset = faceCenterX - frameWidth * (1 - DESIRED_FACE_POS[0])
-                yOffset = faceCenterY - frameHeight * (1 - DESIRED_FACE_POS[1])
-                rOffset = np.sqrt(xOffset**2 + yOffset**2)  # Radius from image center
+                face_center_x = faces[:, 0] + faces[:, 2] / 2  # left edge + half width
+                face_center_y = faces[:, 1] + faces[:, 3] / 2  # lower edge + half height
+                x_offset = face_center_x - frame_width * (1 - DESIRED_FACE_POS[0])
+                y_offset = face_center_y - frame_height * (1 - DESIRED_FACE_POS[1])
+                r_offset = np.sqrt(x_offset**2 + y_offset**2)  # Radius from image center
 
                 # Find face closest to center, calculate position error
-                index_rOffsetMin = np.argmin(rOffset)
-                xError = xOffset[index_rOffsetMin]
-                yError = yOffset[index_rOffsetMin]
+                index_r_offset_min = np.argmin(r_offset)
+                x_error = x_offset[index_r_offset_min]
+                y_error = y_offset[index_r_offset_min]
 
                 # Update camera angle to reduce x and y error
-                panAngle -= PAN_GAIN * xError
-                tiltAngle -= TILT_GAIN * yError
-                update_servo_pos(panAngle, tiltAngle)
+                pan_angle -= PAN_GAIN * x_error
+                tilt_angle -= TILT_GAIN * y_error
+                update_servo_pos(arduino, pan_angle, tilt_angle)
 
                 # Trigger relay if face is close enough
-                if faces[index_rOffsetMin, 2] > frameWidth * MIN_REL_FACE_WIDTH:
-                    if time.perf_counter() > refTime + RETRIGGER_WAIT:
-                        refTime = time.perf_counter()
-                        send_servo_pos("R2\n")  # Send trigger code
+                if faces[index_r_offset_min, 2] > frame_width * MIN_REL_FACE_WIDTH:
+                    if time.perf_counter() > ref_time + RETRIGGER_WAIT:
+                        ref_time = time.perf_counter()
+                        send_servo_pos(arduino, "R2\n")  # Send trigger code
 
                 # Draw rectangle(s) around face(s)
                 for x, y, w, h in faces:
                     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
                 # Reset "no faces" counter
-                noFaceCounter = time.perf_counter()
+                no_face_counter = time.perf_counter()
 
             # Reset camera angle if "no faces" timeout
-            if time.perf_counter() > noFaceCounter + NO_FACE_RESET_TIME:
-                update_servo_pos(DEFAULT_PAN_ANGLE, DEFAULT_TILT_ANGLE)
+            if time.perf_counter() > no_face_counter + NO_FACE_RESET_TIME:
+                update_servo_pos(arduino, DEFAULT_PAN_ANGLE, DEFAULT_TILT_ANGLE)
 
             # Display the resulting frame (with or without faces)
             cv2.imshow("Video", frame)
