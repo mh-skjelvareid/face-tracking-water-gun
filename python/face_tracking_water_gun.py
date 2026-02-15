@@ -16,6 +16,9 @@ import numpy as np
 from serial import Serial
 
 # Set fixed parameters
+BAUD_RATE = 115200  # Baud rate for serial communication with arduino
+ARDUINO_PORT = "/dev/ttyACM0"  # Port for serial communication with arduino
+
 PAN_GAIN = 0.02  # Parameter for adjusting servo pan position
 TILT_GAIN = 0.035  # Parameter for adjusting servo tilt position
 PAN_LIMITS = (0, 170)  # Min / max pan angle
@@ -34,6 +37,11 @@ MIN_REL_FACE_WIDTH = 0.17  # Relative size of face vs screen considered "close"
 NO_FACE_RESET_TIME = 10.0
 DEFAULT_PAN_ANGLE = 90.0
 DEFAULT_TILT_ANGLE = 110.0
+
+CV_WINDOW_WIDTH = 900
+CV_WINDOW_HEIGHT = 900
+RECTANGLE_COLOR = (0, 255, 0)  # Color of rectangle drawn around detected faces
+RECTANGLE_THICKNESS = 2  # Thickness of rectangle drawn around detected faces
 
 
 # Methods for changing camera angle
@@ -57,9 +65,9 @@ def main() -> None:
     # Initialize variables / objects
     pan_angle = DEFAULT_PAN_ANGLE
     tilt_angle = DEFAULT_TILT_ANGLE
-    video_capture = cv2.VideoCapture(0)
+    video_capture = cv2.VideoCapture(0) # 0 for default camera
     face_cascade = cv2.CascadeClassifier(CASCADE_MODEL_PATH)
-    arduino = Serial("/dev/ttyACM0", 115200)  # create serial object named arduino
+    arduino = Serial(ARDUINO_PORT, BAUD_RATE)  # create serial object named arduino
     ref_time = time.perf_counter()
     no_face_counter = time.perf_counter()
 
@@ -68,8 +76,8 @@ def main() -> None:
     update_servo_pos(arduino, pan_angle, tilt_angle)  # Set original tilt
 
     # Create window
-    window = cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Video", 900, 900)
+    _ = cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("Video", CV_WINDOW_WIDTH, CV_WINDOW_HEIGHT)
 
     # Main loop
     try:
@@ -116,7 +124,7 @@ def main() -> None:
 
                 # Draw rectangle(s) around face(s)
                 for x, y, w, h in faces:
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), RECTANGLE_COLOR, RECTANGLE_THICKNESS)
 
                 # Reset "no faces" counter
                 no_face_counter = time.perf_counter()
@@ -127,7 +135,9 @@ def main() -> None:
 
             # Display the resulting frame (with or without faces)
             cv2.imshow("Video", frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+
+            # Check for "q" key press to quit
+            if (cv2.waitKey(1) & 0xFF) == ord("q"): # 0xFF to get last 8 bits of keycode
                 break
 
     finally:
