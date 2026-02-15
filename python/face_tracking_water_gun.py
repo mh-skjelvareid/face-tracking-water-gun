@@ -65,7 +65,7 @@ def main() -> None:
     # Initialize variables / objects
     pan_angle = DEFAULT_PAN_ANGLE
     tilt_angle = DEFAULT_TILT_ANGLE
-    video_capture = cv2.VideoCapture(0) # 0 for default camera
+    video_capture = cv2.VideoCapture(0)  # 0 for default camera
     face_cascade = cv2.CascadeClassifier(CASCADE_MODEL_PATH)
     arduino = Serial(ARDUINO_PORT, BAUD_RATE)  # create serial object named arduino
     ref_time = time.perf_counter()
@@ -96,15 +96,20 @@ def main() -> None:
                 maxSize=CASCADE_FACE_MAX_SIZE,
                 flags=cv2.CASCADE_SCALE_IMAGE,
             )
+            faces = np.array(faces)  # Cast as numpy array (suppress type hint warnings)
 
             # Process detected faces
             if not (len(faces) == 0):  # In any faces detected
                 # Find positions of faces relative to image center
                 face_center_x = faces[:, 0] + faces[:, 2] / 2  # left edge + half width
-                face_center_y = faces[:, 1] + faces[:, 3] / 2  # lower edge + half height
+                face_center_y = (
+                    faces[:, 1] + faces[:, 3] / 2
+                )  # lower edge + half height
                 x_offset = face_center_x - frame_width * (1 - DESIRED_FACE_POS[0])
                 y_offset = face_center_y - frame_height * (1 - DESIRED_FACE_POS[1])
-                r_offset = np.sqrt(x_offset**2 + y_offset**2)  # Radius from image center
+                r_offset = np.sqrt(
+                    x_offset**2 + y_offset**2
+                )  # Radius from image center
 
                 # Find face closest to center, calculate position error
                 index_r_offset_min = np.argmin(r_offset)
@@ -124,7 +129,13 @@ def main() -> None:
 
                 # Draw rectangle(s) around face(s)
                 for x, y, w, h in faces:
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), RECTANGLE_COLOR, RECTANGLE_THICKNESS)
+                    cv2.rectangle(
+                        frame,
+                        (x, y),
+                        (x + w, y + h),
+                        RECTANGLE_COLOR,
+                        RECTANGLE_THICKNESS,
+                    )
 
                 # Reset "no faces" counter
                 no_face_counter = time.perf_counter()
@@ -137,7 +148,9 @@ def main() -> None:
             cv2.imshow("Video", frame)
 
             # Check for "q" key press to quit
-            if (cv2.waitKey(1) & 0xFF) == ord("q"): # 0xFF to get last 8 bits of keycode
+            if (cv2.waitKey(1) & 0xFF) == ord(
+                "q"
+            ):  # 0xFF to get last 8 bits of keycode
                 break
 
     finally:
