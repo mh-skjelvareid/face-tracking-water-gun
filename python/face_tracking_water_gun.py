@@ -17,7 +17,7 @@ from serial import Serial
 
 # Set fixed parameters
 BAUD_RATE = 115200  # Baud rate for serial communication with arduino
-ARDUINO_PORT = "/dev/ttyACM0"  # Port for serial communication with arduino
+DEFAULT_ARDUINO_PORT = "COM4"  # "/dev/ttyACM0"  # Port for serial comm. with arduino
 
 PAN_GAIN = 0.02  # Parameter for adjusting servo pan position
 TILT_GAIN = 0.035  # Parameter for adjusting servo tilt position
@@ -25,7 +25,7 @@ PAN_LIMITS = (0, 170)  # Min / max pan angle
 TILT_LIMITS = (65, 150)  # Min / max tilt angle
 DESIRED_FACE_POS = (0.5, 0.6)  # Desired face center, relative
 
-CASCADE_MODEL_PATH = "haarcascade_frontalface_default.xml"  # Face detection file
+CASCADE_MODEL_FILE = "haarcascade_frontalface_default.xml"  # Face detection file
 CASCADE_SCALE_FACTOR = 1.15  # Difference between scales used for detection
 CASCADE_MIN_NEIGHBORS = (
     5  # Fewer neighbors -> Higher sensitivity. More neighbors -> Fewer false positives
@@ -38,13 +38,15 @@ NO_FACE_RESET_TIME = 10.0
 DEFAULT_PAN_ANGLE = 90.0
 DEFAULT_TILT_ANGLE = 110.0
 
-CV_WINDOW_WIDTH = 900
-CV_WINDOW_HEIGHT = 900
+CV_WINDOW_WIDTH = 960
+CV_WINDOW_HEIGHT = 720
 RECTANGLE_COLOR = (0, 255, 0)  # Color of rectangle drawn around detected faces
 RECTANGLE_THICKNESS = 2  # Thickness of rectangle drawn around detected faces
 
 
-def connect_arduino(port: str = ARDUINO_PORT, baud_rate: int = BAUD_RATE) -> Serial:
+def connect_arduino(
+    port: str = DEFAULT_ARDUINO_PORT, baud_rate: int = BAUD_RATE
+) -> Serial:
     """Create and return serial object for communication with arduino"""
     arduino = Serial(port, baud_rate)
     time.sleep(2)  # Let serial connection be established
@@ -96,21 +98,23 @@ def main() -> None:
     pan_angle = DEFAULT_PAN_ANGLE
     tilt_angle = DEFAULT_TILT_ANGLE
     video_capture = cv2.VideoCapture(0)  # 0 for default camera
-    face_cascade = cv2.CascadeClassifier(CASCADE_MODEL_PATH)
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + CASCADE_MODEL_FILE)
     ref_time = time.perf_counter()
     no_face_counter = time.perf_counter()
-
-    # Connect to arduino and set camera to default angle
-    arduino = connect_arduino()
-    update_servo_pos(arduino, pan_angle, tilt_angle)
 
     # Create window
     _ = cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("Video", CV_WINDOW_WIDTH, CV_WINDOW_HEIGHT)
 
+    # Connect to arduino and set camera to default angle
+    arduino = connect_arduino()
+    update_servo_pos(arduino, pan_angle, tilt_angle)
+
     # Main loop
     try:
         while True:
+            time.sleep(0.1)  # Sleep for testing
+
             # Capture frame-by-frame, convert to greyscale for face detection
             _, frame = video_capture.read()
             gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
