@@ -68,10 +68,12 @@ def draw_face_rectangles(frame: np.ndarray, faces: np.ndarray) -> None:
         )
 
 
-def main(camera_index: int = DEFAULT_CAMERA_INDEX, serial_port: str = DEFAULT_ARDUINO_PORT) -> None:
+def main(
+    camera_index: int = DEFAULT_CAMERA_INDEX, serial_port: str = DEFAULT_ARDUINO_PORT
+) -> None:
     """
     Main function for face detection.
-    
+
     Args:
         camera_index: Index of the camera to use (default: 0)
         serial_port: Serial port for Arduino communication (default: "COM4")
@@ -132,16 +134,18 @@ def parse_arguments():
         description="Detect and display faces in a video stream"
     )
     parser.add_argument(
-        "-c", "--camera",
+        "-c",
+        "--camera",
         type=int,
         default=DEFAULT_CAMERA_INDEX,
-        help=f"Camera index (default: {DEFAULT_CAMERA_INDEX})"
+        help=f"Camera index (default: {DEFAULT_CAMERA_INDEX})",
     )
     parser.add_argument(
-        "-p", "--port",
+        "-p",
+        "--port",
         type=str,
         default=DEFAULT_ARDUINO_PORT,
-        help=f"Serial port for Arduino (default: {DEFAULT_ARDUINO_PORT})"
+        help=f"Serial port for Arduino (default: {DEFAULT_ARDUINO_PORT})",
     )
     return parser.parse_args()
 
@@ -149,4 +153,4 @@ def parse_arguments():
 # Run the main function
 if __name__ == "__main__":
     args = parse_arguments()
-    main(camera_index=args.camera, serial_port=args.port)    main(camera_index=args.camera, serial_port=args.port)
+    main(camera_index=args.camera, serial_port=args.port)
