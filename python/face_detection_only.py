@@ -9,7 +9,7 @@ is controlled by serial communication with an Arduino.
 """
 
 # Imports
-import time
+import argparse
 
 import cv2
 import numpy as np
@@ -17,6 +17,7 @@ import numpy as np
 # Set fixed parameters
 BAUD_RATE = 115200  # Baud rate for serial communication with arduino
 DEFAULT_ARDUINO_PORT = "COM4"  # "/dev/ttyACM0"  # Port for serial comm. with arduino
+DEFAULT_CAMERA_INDEX = 0  # Default camera index
 
 PAN_GAIN = 0.02  # Parameter for adjusting servo pan position
 TILT_GAIN = 0.035  # Parameter for adjusting servo tilt position
@@ -67,10 +68,17 @@ def draw_face_rectangles(frame: np.ndarray, faces: np.ndarray) -> None:
         )
 
 
-def main() -> None:
+def main(camera_index: int = DEFAULT_CAMERA_INDEX, serial_port: str = DEFAULT_ARDUINO_PORT) -> None:
+    """
+    Main function for face detection.
+    
+    Args:
+        camera_index: Index of the camera to use (default: 0)
+        serial_port: Serial port for Arduino communication (default: "COM4")
+    """
     # Initialize variables / objects
-    video_capture = cv2.VideoCapture(0)  # 0 for default camera
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + CASCADE_MODEL_FILE)
+    video_capture = cv2.VideoCapture(camera_index)
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + CASCADE_MODEL_FILE)  # type: ignore
 
     # Create window
     _ = cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
@@ -118,6 +126,27 @@ def main() -> None:
         cv2.destroyAllWindows()
 
 
+def parse_arguments():
+    """Parse command-line arguments"""
+    parser = argparse.ArgumentParser(
+        description="Detect and display faces in a video stream"
+    )
+    parser.add_argument(
+        "-c", "--camera",
+        type=int,
+        default=DEFAULT_CAMERA_INDEX,
+        help=f"Camera index (default: {DEFAULT_CAMERA_INDEX})"
+    )
+    parser.add_argument(
+        "-p", "--port",
+        type=str,
+        default=DEFAULT_ARDUINO_PORT,
+        help=f"Serial port for Arduino (default: {DEFAULT_ARDUINO_PORT})"
+    )
+    return parser.parse_args()
+
+
 # Run the main function
 if __name__ == "__main__":
-    main()
+    args = parse_arguments()
+    main(camera_index=args.camera, serial_port=args.port)    main(camera_index=args.camera, serial_port=args.port)
