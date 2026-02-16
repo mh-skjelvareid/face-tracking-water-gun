@@ -34,7 +34,7 @@ CASCADE_FACE_MIN_SIZE = (60, 60)  # Minimum face size [pixels]
 CASCADE_FACE_MAX_SIZE = (350, 350)  # Maximum face size [pixels]
 RETRIGGER_WAIT = 5  # How long to wait between activating relay
 MIN_REL_FACE_WIDTH = 0.17  # Relative size of face vs screen considered "close"
-NO_FACE_RESET_TIME = 10.0
+NO_FACE_RESET_TIME = 4.0
 DEFAULT_PAN_ANGLE = 90.0
 DEFAULT_TILT_ANGLE = 110.0
 
@@ -68,9 +68,7 @@ def draw_face_rectangles(frame: np.ndarray, faces: np.ndarray) -> None:
         )
 
 
-def main(
-    camera_index: int = DEFAULT_CAMERA_INDEX, serial_port: str = DEFAULT_ARDUINO_PORT
-) -> None:
+def main(camera_index: int = DEFAULT_CAMERA_INDEX) -> None:
     """
     Main function for face detection.
 
@@ -115,12 +113,12 @@ def main(
                 # Draw rectangle(s) around face(s)
                 draw_face_rectangles(frame, faces)
 
-            # Display the resulting frame (with or without faces)
-            cv2.imshow("Video", frame)
-
-            # Check for "q" key press to quit
+            # Check if "q" key was pressed to quit
             if (cv2.waitKey(1) & 0xFF) == ord("q"):  # 0xFF for last 8 bits
                 break
+
+            # Display the resulting frame (with or without faces)
+            cv2.imshow("Video", frame)
 
     finally:
         #  Clean up
@@ -140,17 +138,11 @@ def parse_arguments():
         default=DEFAULT_CAMERA_INDEX,
         help=f"Camera index (default: {DEFAULT_CAMERA_INDEX})",
     )
-    parser.add_argument(
-        "-p",
-        "--port",
-        type=str,
-        default=DEFAULT_ARDUINO_PORT,
-        help=f"Serial port for Arduino (default: {DEFAULT_ARDUINO_PORT})",
-    )
     return parser.parse_args()
 
 
 # Run the main function
 if __name__ == "__main__":
+    print("Welcome to the face detection test! Press 'q' to quit.")
     args = parse_arguments()
-    main(camera_index=args.camera, serial_port=args.port)
+    main(camera_index=args.camera)
