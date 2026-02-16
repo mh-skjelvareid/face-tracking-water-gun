@@ -9,6 +9,7 @@ is controlled by serial communication with an Arduino.
 """
 
 # Imports
+import argparse
 import time
 
 import cv2
@@ -18,12 +19,14 @@ from serial import Serial
 # Set fixed parameters
 BAUD_RATE = 115200  # Baud rate for serial communication with arduino
 DEFAULT_ARDUINO_PORT = "COM4"  # "/dev/ttyACM0"  # Port for serial comm. with arduino
+DEFAULT_CAMERA_INDEX = 1  # Indexing starts at 0, 1 is second camera
 
 PAN_GAIN = 0.02  # Parameter for adjusting servo pan position
 TILT_GAIN = 0.035  # Parameter for adjusting servo tilt position
 PAN_LIMITS = (0, 170)  # Min / max pan angle
 TILT_LIMITS = (65, 150)  # Min / max tilt angle
-DESIRED_FACE_POS = (0.5, 0.6)  # Desired face center, relative
+DEFAULT_PAN_ANGLE = 90.0
+DEFAULT_TILT_ANGLE = 110.0
 
 CASCADE_MODEL_FILE = "haarcascade_frontalface_default.xml"  # Face detection file
 CASCADE_SCALE_FACTOR = 1.15  # Difference between scales used for detection
@@ -32,16 +35,16 @@ CASCADE_MIN_NEIGHBORS = (
 )
 CASCADE_FACE_MIN_SIZE = (60, 60)  # Minimum face size [pixels]
 CASCADE_FACE_MAX_SIZE = (350, 350)  # Maximum face size [pixels]
-RETRIGGER_WAIT = 5  # How long to wait between activating relay
+DESIRED_FACE_POS = (0.5, 0.6)  # Desired face center, relative
 MIN_REL_FACE_WIDTH = 0.17  # Relative size of face vs screen considered "close"
-NO_FACE_RESET_TIME = 10.0
-DEFAULT_PAN_ANGLE = 90.0
-DEFAULT_TILT_ANGLE = 110.0
 
 CV_WINDOW_WIDTH = 960
 CV_WINDOW_HEIGHT = 720
 RECTANGLE_COLOR = (0, 255, 0)  # Color of rectangle drawn around detected faces
 RECTANGLE_THICKNESS = 2  # Thickness of rectangle drawn around detected faces
+
+RETRIGGER_RELAY_WAIT = 3.0  # How long to wait between activating relay
+NO_FACE_RESET_TIME = 4.0
 
 
 def connect_arduino(
@@ -93,28 +96,43 @@ def draw_face_rectangles(frame: np.ndarray, faces: np.ndarray) -> None:
         )
 
 
-def main() -> None:
-    # Initialize variables / objects
-    pan_angle = DEFAULT_PAN_ANGLE
-    tilt_angle = DEFAULT_TILT_ANGLE
-    video_capture = cv2.VideoCapture(0)  # 0 for default camera
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + CASCADE_MODEL_FILE)
-    ref_time = time.perf_counter()
-    no_face_counter = time.perf_counter()
+def main(
+    camera_index: int = DEFAULT_CAMERA_INDEX, serial_port: str = DEFAULT_ARDUINO_PORT
+) -> None:
+    """
+    Main function for face detection.
+
+    Args:
+        camera_index: Index of the camera to use (default: 0)
+        serial_port: Serial port for Arduino communication (default: "COM4")
+    """
+
+    # Wait to limit frame rate and avoid overloading the serial communication
+    time.sleep(0.025)
+
+    # Initialize OpenCV video capture and face cascade classifier
+    video_capture = cv2.VideoCapture(camera_index)
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + CASCADE_MODEL_FILE)  # type: ignore
 
     # Create window
     _ = cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("Video", CV_WINDOW_WIDTH, CV_WINDOW_HEIGHT)
 
+    # Initialize pan/tilt angles
+    pan_angle = DEFAULT_PAN_ANGLE
+    tilt_angle = DEFAULT_TILT_ANGLE
+
     # Connect to arduino and set camera to default angle
-    arduino = connect_arduino()
+    arduino = connect_arduino(serial_port)
     update_servo_pos(arduino, pan_angle, tilt_angle)
+
+    # Initialize timers
+    ref_time = time.perf_counter()
+    no_face_counter = time.perf_counter()
 
     # Main loop
     try:
         while True:
-            time.sleep(0.1)  # Sleep for testing
-
             # Capture frame-by-frame, convert to greyscale for face detection
             _, frame = video_capture.read()
             gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -150,7 +168,7 @@ def main() -> None:
 
                 # Trigger relay if face is close enough
                 if faces[min_r_offset_index, 2] > frame_width * MIN_REL_FACE_WIDTH:
-                    if time.perf_counter() > ref_time + RETRIGGER_WAIT:
+                    if time.perf_counter() > ref_time + RETRIGGER_RELAY_WAIT:
                         ref_time = time.perf_counter()
                         send_servo_pos(arduino, "R2\n")  # Send trigger code
 
@@ -180,6 +198,30 @@ def main() -> None:
         arduino.close()
 
 
+def parse_arguments():
+    """Parse command-line arguments"""
+    parser = argparse.ArgumentParser(
+        description="Detect and display faces in a video stream"
+    )
+    parser.add_argument(
+        "-c",
+        "--camera",
+        type=int,
+        default=DEFAULT_CAMERA_INDEX,
+        help=f"Camera index (default: {DEFAULT_CAMERA_INDEX})",
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=str,
+        default=DEFAULT_ARDUINO_PORT,
+        help=f"Arduino serial port (default: {DEFAULT_ARDUINO_PORT})",
+    )
+
+    return parser.parse_args()
+
+
 # Run the main function
 if __name__ == "__main__":
-    main()
+    args = parse_arguments()
+    main(camera_index=args.camera, serial_port=args.port)
