@@ -23,7 +23,8 @@ DEFAULT_CAMERA_INDEX = 1  # Indexing starts at 0, 1 is second camera
 FRAME_RATE = 30  # Desired frame rate for video capture (not guaranteed, depends on processing speed)
 
 PAN_GAIN = 0.02  # Parameter for adjusting servo pan position
-TILT_GAIN = 0.035  # Parameter for adjusting servo tilt position
+# TILT_GAIN = 0.035  # Parameter for adjusting servo tilt position
+TILT_GAIN = 0.03  # Parameter for adjusting servo tilt position
 PAN_LIMITS = (0, 170)  # Min / max pan angle
 TILT_LIMITS = (65, 150)  # Min / max tilt angle
 DEFAULT_PAN_ANGLE = 90.0
