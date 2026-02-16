@@ -37,7 +37,7 @@ CASCADE_MIN_NEIGHBORS = (
 CASCADE_FACE_MIN_SIZE = (60, 60)  # Minimum face size [pixels]
 CASCADE_FACE_MAX_SIZE = (350, 350)  # Maximum face size [pixels]
 DESIRED_FACE_POS = (0.5, 0.6)  # Desired face center, relative
-MIN_REL_FACE_WIDTH = 0.17  # Relative size of face vs screen considered "close"
+MIN_REL_FACE_WIDTH = 0.15  # Relative size of face vs screen considered "close"
 
 CV_WINDOW_WIDTH = 960
 CV_WINDOW_HEIGHT = 720
