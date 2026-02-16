@@ -1,11 +1,11 @@
 from time import sleep
 
 from face_tracking_water_gun import connect_arduino, send_servo_pos, update_servo_pos
-from serial import Serial
 from serial.tools.list_ports import comports
 
-# for port in comports():
-#     print(f"{port.device}: {port.description}")
+print("Available serial ports:")
+for port in comports():
+    print(f"{port.device}: {port.description}")
 
 arduino = connect_arduino()
 try:
