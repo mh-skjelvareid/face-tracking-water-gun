@@ -20,6 +20,7 @@ from serial import Serial
 BAUD_RATE = 115200  # Baud rate for serial communication with arduino
 DEFAULT_ARDUINO_PORT = "COM4"  # "/dev/ttyACM0"  # Port for serial comm. with arduino
 DEFAULT_CAMERA_INDEX = 1  # Indexing starts at 0, 1 is second camera
+FRAME_RATE = 30  # Desired frame rate for video capture (not guaranteed, depends on processing speed)
 
 PAN_GAIN = 0.02  # Parameter for adjusting servo pan position
 TILT_GAIN = 0.035  # Parameter for adjusting servo tilt position
@@ -107,9 +108,6 @@ def main(
         serial_port: Serial port for Arduino communication (default: "COM4")
     """
 
-    # Wait to limit frame rate and avoid overloading the serial communication
-    time.sleep(0.025)
-
     # Initialize OpenCV video capture and face cascade classifier
     video_capture = cv2.VideoCapture(camera_index)
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + CASCADE_MODEL_FILE)  # type: ignore
@@ -127,12 +125,18 @@ def main(
     update_servo_pos(arduino, pan_angle, tilt_angle)
 
     # Initialize timers
-    ref_time = time.perf_counter()
-    no_face_counter = time.perf_counter()
+    last_trigger_time = time.perf_counter()
+    face_last_seen_time = time.perf_counter()
+
+    # Calculate target frame duration for frame rate limiting
+    target_frame_duration = 1.0 / FRAME_RATE
 
     # Main loop
     try:
         while True:
+            # Record loop start time for frame rate control
+            loop_start_time = time.perf_counter()
+
             # Capture frame-by-frame, convert to greyscale for face detection
             _, frame = video_capture.read()
             gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -168,18 +172,18 @@ def main(
 
                 # Trigger relay if face is close enough
                 if faces[min_r_offset_index, 2] > frame_width * MIN_REL_FACE_WIDTH:
-                    if time.perf_counter() > ref_time + RETRIGGER_RELAY_WAIT:
-                        ref_time = time.perf_counter()
+                    if time.perf_counter() > last_trigger_time + RETRIGGER_RELAY_WAIT:
+                        last_trigger_time = time.perf_counter()
                         send_servo_pos(arduino, "R2\n")  # Send trigger code
 
                 # Draw rectangle(s) around face(s)
                 draw_face_rectangles(frame, faces)
 
                 # Face(s) detected, reset "no faces" counter
-                no_face_counter = time.perf_counter()
+                face_last_seen_time = time.perf_counter()
 
             # Reset camera angle if "no faces" timeout
-            if time.perf_counter() > no_face_counter + NO_FACE_RESET_TIME:
+            if time.perf_counter() > face_last_seen_time + NO_FACE_RESET_TIME:
                 update_servo_pos(arduino, DEFAULT_PAN_ANGLE, DEFAULT_TILT_ANGLE)
 
             # Display the resulting frame (with or without faces)
@@ -190,6 +194,12 @@ def main(
                 "q"
             ):  # 0xFF to get last 8 bits of keycode
                 break
+
+            # Sleep to maintain target frame rate (best-effort)
+            elapsed_time = time.perf_counter() - loop_start_time
+            sleep_time = target_frame_duration - elapsed_time
+            if sleep_time > 0:
+                time.sleep(sleep_time)
 
     finally:
         #  Clean up
